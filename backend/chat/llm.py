@@ -1,3 +1,4 @@
+import json
 import os
 
 import requests
@@ -41,7 +42,14 @@ As a helpful assistant, your task is to:
    - User identification
    - Order status or location
 3. Once you have enough context, return a clear natural language summary of what will be queried.
-4. Output should always be concise, structured, and ask for missing details if needed.
+4. If sufficient context is available, output your response in this JSON format:
+
+{
+  "summary": "natural language summary of what will be done",
+  "sql": "SELECT ... FROM ... WHERE ..."
+}
+
+Only generate a SQL query if you are absolutely confident that all needed details have been collected. If not, ask for clarification instead.
 """
 
     prompt = f"""{schema}
@@ -78,6 +86,25 @@ def get_llm_response(user_input, context=None, model="llama3-70b-8192"):
     try:
         response = requests.post(GROQ_API_URL, headers=headers, json=payload)
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        content = response.json()["choices"][0]["message"]["content"]
+
+        try:
+            parsed = json.loads(content)
+            return {
+                "summary": parsed.get("summary"),
+                "sql": parsed.get("sql"),
+                "raw": content,
+            }
+        except json.JSONDecodeError:
+            return {
+                "summary": content,
+                "sql": None,
+                "raw": content,
+            }
+
     except requests.exceptions.RequestException as e:
-        return f"Error contacting LLM API: {str(e)}"
+        return {
+            "summary": f"Error contacting LLM API: {str(e)}",
+            "sql": None,
+            "raw": None,
+        }
