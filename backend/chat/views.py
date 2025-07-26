@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .llm import build_prompt, get_llm_response
 from .models import ChatHistory
 from .serialzers import ChatHistorySerializer
 
@@ -29,9 +30,9 @@ class ChatView(APIView):
             reversed([entry.llm_response for entry in previous_contexts])
         )
 
-        prompt = f"{context_text}\nUser: {input_text}" if context_text else input_text
-        llm_response = f"LLM response to: {prompt}"
-
+        prompt = build_prompt(context_text, input_text)
+        llm_response = get_llm_response(input_text, prompt)
+        print(llm_response)
         chat = ChatHistory.objects.create(
             user_id=user_id,
             chat_id=chat_id,
